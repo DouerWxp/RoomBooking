@@ -7,15 +7,20 @@ import logging
 import dill
 import pandas as pd
 
+#log initialization
 logging.basicConfig(filename='log/roombooking.log',level=logging.INFO)
 
+#structure three types 
 BOOKING=namedtuple('Booking',['booking_id','room_id','user','start_time','end_time'])
 CANCEL=namedtuple('Cancel',['cancel_id','booking_id'])
 TOKENMEM=namedtuple('TempToken',['expired_time','token','authority'])
 
+#identify a class to store room information
 class Room(object):
-    def __init__(self,ID:int,Building:str,Name:str,Capacity:int,Type:str,Facilities:str) -> None:
+    def __init__(self,ID:int,Building:str,Name:str,Capacity:int,Type:str,Facilities:str):
         super().__init__()
+        
+        #init attribute information
         self.ID=int(ID)
         self.Building=Building
         self.Name=Name
@@ -23,9 +28,11 @@ class Room(object):
         self.Type=Type
         self.Facilities=Facilities
         
+        #init booking information
         self.bookings=defaultdict(BOOKING)
         self.save_dir='cache/room_booking/'
-        
+    
+    #update Room information  
     def update_info(self,ID:int=None,Building:str=None,Name:str=None,Capacity:int=None,Type:str=None,Facilities:str=None):
         if not ID==None:
             self.ID=ID
@@ -40,6 +47,9 @@ class Room(object):
         if not Facilities==None:
             self.Facilities=Facilities
     
+    # booking process
+    # input: booking information
+    # output: success(True) or error(False)
     def book(self,booking):
         if self.is_available(booking):
             self.bookings[booking.booking_id]=(booking)
@@ -48,12 +58,16 @@ class Room(object):
         logging.error('Time clash')
         return False
     
+    # cancel booking 
+    # input: booking ID
+    # output: success(True) or error(False)
     def cancel(self,booking_id):
         if booking_id in self.bookings.keys():
             self.bookings.pop(booking_id)
             return True
         return False
     
+    #check if the booking time is available
     def is_available(self,booking):
         available=True
         
@@ -65,6 +79,7 @@ class Room(object):
         
         return available
     
+    # store the booking information in a csv file
     def booking_to_csv(self):
         df=pd.DataFrame(columns=['user','start_time','end_time'])
         for booking in self.bookings.values():
@@ -78,9 +93,9 @@ class Room(object):
         return datetime.datetime.strptime(time_str,"%Y-%m-%d %H:%M")
 
 
-
+# identify a class to manage rooms
 class RoomManager(object):
-    def __init__(self,datafile) -> None:
+    def __init__(self,datafile):
         super().__init__()
         self.datafile=datafile
         self.RoomData=defaultdict(Room)
@@ -109,12 +124,14 @@ class RoomManager(object):
             return 1
         return -1
     
+    # identify user by token 
     def get_user(self,token):
         for username,value in self.token_mem.items():
             if value.token==token:
                 return username
         return False
     
+    # register a new account checking if the username has been used
     def register(self,username,password):
         
         if username in self.access_guest_token.keys() or username in self.access_admin_token.keys():
@@ -125,6 +142,7 @@ class RoomManager(object):
         print('Register Successful')
         return True
     
+    # import the username and password of managers
     def admin_from_csv(self,filepath):
         df=pd.read_csv(filepath)
         for _,row in df.iterrows():
@@ -133,6 +151,8 @@ class RoomManager(object):
             self.access_admin_token[username]=self.gen_token(username,password)
         return
     
+    # log in
+    # if log in successful return template token otherwise False
     def login(self,username,password):
         login_token=self.gen_token(username,password)
         
@@ -153,6 +173,7 @@ class RoomManager(object):
         with open(self.datafile,'wb') as f:
             self=dill.dump(self,f)
 
+    # bulk import room information 
     def room_list_from_csv(self,filepath):
         if not os.path.exists(filepath):
             return False
@@ -165,6 +186,7 @@ class RoomManager(object):
                 self.RoomData[row['ID']]=Room(row['ID'],row['Building'],row['Name'],row['Capacity'],row['Type'],row['Facilities'])
         return True
     
+    # bulk export room information
     def room_list_to_csv(self,filepath):
         df=pd.DataFrame(columns=['ID','Building','Name','Capacity','Type','Facilities'])
         for room in self.RoomData.values():
@@ -178,7 +200,7 @@ class RoomManager(object):
         df.to_csv(filepath,index=False)
         return
     
-    
+    # get booking information of all rooms 
     def get_booking_list(self):
         booking_list=defaultdict(BOOKING)
         for room in self.RoomData.values():
@@ -187,7 +209,8 @@ class RoomManager(object):
                 
         return booking_list
     
-    # the valid operation of admin
+    # the valid operations of admin
+    # add room
     def add_room(self,token:str,room:Room):
         if self.check_token(token)==0:
             for exist_room in self.RoomData:
@@ -198,12 +221,14 @@ class RoomManager(object):
             return True
         return False
     
+    # delete room
     def delete_room(self,token,room:Room):
         if self.check_token(token)==0:
             self.RoomData.pop(room.ID)
             return True
         return False 
     
+    # add booking 
     def add_booking(self,token,booking:BOOKING):
         if self.check_token(token)==0:
             room_id=booking.room_id
@@ -211,6 +236,7 @@ class RoomManager(object):
             return True
         return False
     
+    # delete booking 
     def del_booking(self,token,booking_id):
         if self.check_token(token)==0:
             booking_list=self.get_booking_list()
@@ -219,7 +245,8 @@ class RoomManager(object):
                 return self.RoomData[room_id].cancel(booking_id)
         return False
     
-    # the valid operation of guest
+    # the valid operations of guests
+    # add booking operation in the booking queue
     def book_room(self,token,ID,start_time,end_time):
         if self.check_token(token)==-1:
             return False
@@ -230,6 +257,7 @@ class RoomManager(object):
         self.booking_count+=1
         return True
     
+    # add canceling operation in the canceling queue
     def cancel_book(self,token,booking_id):
         if self.check_token(token)==-1:
             return False
