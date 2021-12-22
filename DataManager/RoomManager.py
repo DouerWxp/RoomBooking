@@ -8,6 +8,8 @@ import dill
 import pandas as pd
 
 #log initialization
+if not os.path.exists('log'):
+    os.mkdir('log')
 logging.basicConfig(filename='log/roombooking.log',level=logging.INFO)
 
 #structure three types 
@@ -71,7 +73,7 @@ class Room(object):
     def is_available(self,booking):
         available=True
         
-        for exist_booking in self.bookings:
+        for exist_booking in self.bookings.values():
             if self.str2time(booking.start_time)>=self.str2time(exist_booking.start_time) and self.str2time(booking.start_time)<self.str2time(exist_booking.end_time):
                 available=False
             if self.str2time(booking.end_time)>self.str2time(exist_booking.start_time) and self.str2time(booking.end_time)<=self.str2time(exist_booking.end_time):
@@ -213,7 +215,7 @@ class RoomManager(object):
     # add room
     def add_room(self,token:str,room:Room):
         if self.check_token(token)==0:
-            for exist_room in self.RoomData:
+            for exist_room in self.RoomData.values():
                 if room.ID==exist_room.ID:
                     print('ID clash: the ID of rooms should be different')
                     return False
@@ -222,22 +224,22 @@ class RoomManager(object):
         return False
     
     # delete room
-    def delete_room(self,token,room:Room):
+    def delete_room(self,token,room_id:int):
         if self.check_token(token)==0:
-            self.RoomData.pop(room.ID)
+            self.RoomData.pop(room_id)
             return True
         return False 
     
     # add booking 
     def add_booking(self,token,booking:BOOKING):
         if self.check_token(token)==0:
-            room_id=booking.room_id
+            room_id=int(booking.room_id)
             self.RoomData[room_id].book(booking)
             return True
         return False
     
     # delete booking 
-    def del_booking(self,token,booking_id):
+    def delete_booking(self,token,booking_id):
         if self.check_token(token)==0:
             booking_list=self.get_booking_list()
             if booking_id in booking_list.keys():

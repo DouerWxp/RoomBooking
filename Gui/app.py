@@ -1,14 +1,17 @@
 import os
 import sys
-from PyQt5.QtWidgets import QMainWindow,QDialog,QLineEdit,QHeaderView,QTableWidgetItem
+from PyQt5.QtWidgets import QMainWindow,QDialog,QLineEdit,QHeaderView,QTableWidgetItem,QAbstractItemView, QWidget
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.uic import loadUi
 
-from DataManager.RoomManager import RoomManager
+from DataManager.RoomManager import BOOKING, RoomManager,Room
 
+# ui files
 login_ui_file='Gui/login.ui'
-main_ui_file='Gui/booking.ui'
+admin_ui_file='Gui/admin.ui'
+confirm_ui_file='Gui/confirm.ui'
 
+# data files
 manager_file='cache/room_manager.pkl'
 admin_file='cache/admin.csv'
 room_list_file='cache/room_list.csv'
@@ -16,6 +19,7 @@ token_file='cache/token'
 
 class LoginWindow(QDialog):
     
+    # signal connect to the main window
     login_signal=pyqtSignal(dict)
     
     def __init__(self,parent=None):
@@ -25,9 +29,7 @@ class LoginWindow(QDialog):
         self.login_button.rejected.connect(self.close)
         self.login_password.setEchoMode(QLineEdit.Password)
     
-    def closeEvent(self,event):
-        sys.exit(0)
-    
+    # send the username and password to the main window checking if correct
     def login(self):
         username=self.login_username.text()
         password=self.login_password.text()
@@ -38,22 +40,57 @@ class LoginWindow(QDialog):
                  'remember':remember}
 
         self.login_signal.emit(content)
+    
+    # if close the login window, then exit the whole program
+    def closeEvent(self,event):
+        sys.exit(0)
+
+class ConfirmWindow(QDialog):
+    
+    confirm_signal=pyqtSignal(dict)
+    
+    def __init__(self,parent=None):
+        super(ConfirmWindow,self).__init__(parent)
+        loadUi(confirm_ui_file,self)
+        
+        self.buttonBox.rejected.connect(self.reject)
+        self.buttonBox.accepted.connect(self.accept)
+        
+    def set_text(self,text):
+        self.textBrowser.setText(text)
+    
+    def accept(self):
+        content={'accepted':True}
+        self.confirm_signal.emit(content)
+        self.buttonBox.accepted.disconnect(self.accept)
+        self.close()
+    
+    def reject(self):
+        self.close()
+    
+    def closeEvent(self,event):
+        event.accept()
+            
+    
         
 
-class MainWindow(QMainWindow):
+class MainWindow(QWidget):
     def __init__(self,parent=None):
         super(MainWindow,self).__init__(parent)
-        loadUi(main_ui_file,self)
+        self.resize(1,1)
         
         self.manager=RoomManager(manager_file).load()
         self.manager.admin_from_csv(admin_file)
         self.manager.room_list_from_csv(room_list_file)
         
         self.token=None
-        self.room_prop_count=6
-        
+        self.auth=None
         self.check_login()
-        self.show_room_list()
+        
+        if self.auth==0:
+            window=AdminWindow(self.manager,self.token,self)
+            window.show()
+            
         
     def login(self,content):
         username=content['username']
@@ -64,6 +101,8 @@ class MainWindow(QMainWindow):
             self.check_login()
             return
         
+        self.auth=self.manager.check_token(self.token)
+        self.user=self.manager.get_user(self.token)
         if remember:
             with open(token_file,'w+',encoding='utf-8') as f:
                 f.write(self.token)
@@ -73,35 +112,260 @@ class MainWindow(QMainWindow):
             with open(token_file,'r+',encoding='utf-8') as f:
                 self.token=f.read()
             if self.manager.check_token(self.token)!=-1:
+                self.auth=self.manager.check_token(self.token)
+                self.user=self.manager.get_user(self.token)
                 return True
         
         login_window=LoginWindow(self)
         login_window.login_signal.connect(self.login)
         login_window.exec_()
+    
+    def closeEvent(self,event):
+        pass
+
+
+class AdminWindow(QMainWindow):
+    def __init__(self,manager:RoomManager,token,parent=None):
+        super(AdminWindow,self).__init__(parent)
         
+        self.manager=manager
+        self.token=token
+        self.user=self.manager.get_user(self.token)
+        self.room_prop_count=6
+        self.booking_prop_count=5
+        # record the type of page shown
+        self.page=None
+        # record the id of the room operated now
+        self.room_now=None
+        # record the row selected now
+        self.row_selected=None
+        
+        loadUi(admin_ui_file,self)
+        self.back_button.clicked.connect(self.back)
+        
+        self.edit_button.clicked.connect(self.edit_table)
+        self.add_button.clicked.connect(self.add_row)
+        self.confirm_button.clicked.connect(self.confirm_change)
+        self.delete_button.clicked.connect(self.try_del_row)
+        self.room_list_table.cellDoubleClicked.connect(self.entrance_room_booking)
+        self.room_list_table.cellClicked.connect(self.record_row)
+        
+        
+        self.pages={}
+        self.pages['room']=[self.room_list_table]
+        self.pages['booking']=[self.room_booking_table]
+        
+        self.show_room_list()
+        
+    # change visible of forms by the content of self.page
+    def change_visible(self):
+        for key,value in self.pages.items():
+            if key==self.page:
+                for item in value:
+                    item.setVisible(True)
+            else:
+                for item in value:
+                    item.setVisible(False)
+    
     def show_room_list(self):
+        self.page='room'
+        self.change_visible()
+        
         RoomData=self.manager.RoomData
         
-        self.room_list.setRowCount(len(RoomData))
-        self.room_list.setColumnCount(self.room_prop_count)
-        self.room_list.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.room_list.setHorizontalHeaderLabels(['ID','Building','Name','Capacity','Type','Facilities'])
+        table=self.room_list_table
+        
+        table.setRowCount(len(RoomData))
+        table.setColumnCount(self.room_prop_count)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.setHorizontalHeaderLabels(['ID','Building','Name','Capacity','Type','Facilities'])
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        
         row=0
         for room in RoomData.values():
-            self.table_set_text(self.room_list,row,0,room.ID)
-            self.table_set_text(self.room_list,row,1,room.Building)
-            self.table_set_text(self.room_list,row,2,room.Name)
-            self.table_set_text(self.room_list,row,3,room.Capacity)
-            self.table_set_text(self.room_list,row,4,room.Type)
-            self.table_set_text(self.room_list,row,5,room.Facilities)
+            self.table_set_text(table,row,0,room.ID)
+            self.table_set_text(table,row,1,room.Building)
+            self.table_set_text(table,row,2,room.Name)
+            self.table_set_text(table,row,3,room.Capacity)
+            self.table_set_text(table,row,4,room.Type)
+            self.table_set_text(table,row,5,room.Facilities)
             row+=1
+    
+    def entrance_room_booking(self,row,col):
+        # get the room_id selected and record it
+        room_id=int(self.get_table_text(row,0))
+        self.room_now=room_id
+        self.show_room_booking(room_id)
+        pass
+    
+    def show_room_booking(self,room_id):
+        self.page='booking'
+        self.change_visible()
+        
+        room=self.manager.RoomData[room_id]
+        bookings=room.bookings
+        
+        
+        table=self.room_booking_table
+        table.setRowCount(len(bookings))
+        table.setColumnCount(self.booking_prop_count)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        table.setHorizontalHeaderLabels(['booking_id','room_id','user','start_time','end_time'])
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        
+        row=0
+        for booking in bookings.values():
+            self.table_set_text(table,row,0,booking.booking_id)
+            self.table_set_text(table,row,1,booking.room_id)
+            self.table_set_text(table,row,2,booking.user)
+            self.table_set_text(table,row,3,booking.start_time)
+            self.table_set_text(table,row,4,booking.end_time)
+            row+=1
+    
+    # get the table shown now
+    def get_table_shown(self):
+        if self.page=='room':
+            return self.room_list_table
+        if self.page=='booking':
+            return self.room_booking_table
+        self.log('page error!')
+    
+    def get_table_text(self,row,col):
+        table=self.get_table_shown()
+        item=table.item(row,col)
+        if item==None:
+            return None
+        return item.text()
+    
+    def edit_table(self):
+        self.confirm_button.setText('Confirm*')
+        
+        table=self.get_table_shown()
+        table.setEditTriggers(QAbstractItemView.CurrentChanged)
+        self.log('start edit......')
+        
+    def record_row(self,row,col):
+        self.row_selected=row
+        print(row)
+    
+    def add_row(self):
+        self.confirm_button.setText('Confirm*')
+        
+        table=self.get_table_shown()
+        table.setRowCount(table.rowCount()+1)
+        self.edit_table()
+        pass
+    
+    def try_del_row(self):
+        confirm_window=ConfirmWindow(self)
+        confirm_window.confirm_signal.connect(self.delete_row)
+
+        if self.page=='room':
+            # get the room id of the room selected
+            try:
+                room_id=int(self.get_table_text(self.row_selected,0))
+                print(room_id)
+                text='Delete the room: '+str(room_id)
+                confirm_window.set_text(text)
+            except:
+                self.log('Error, Please check the row selected')
+                return
+            
+        if self.page=='booking':
+            try:
+                # get the room id of the room selected
+                room_id=self.room_now
+                booking_id=int(self.get_table_text(self.row_selected,0))
+                text='Delete the booking: '+str(booking_id)+'on the room '+str(room_id)
+                confirm_window.set_text(text)
+            except:
+                self.log('Error, Please check the row selected')
+                return
+        
+        confirm_window.exec_()
+    
+    # delete a row data
+    def delete_row(self,accepted):
+        if not accepted:
+            return
+        
+        if self.page=='room':
+            room_id=int(self.get_table_text(self.row_selected,0))
+            # execute the operation of delete room
+            status=self.manager.delete_room(self.token,room_id)
+            if status:
+                self.log('Delete room '+str(room_id)+' successful')
+            else:
+                self.log('Delete failure')
+            # flash page
+            self.show_room_list()
+        
+        if self.page=='booking':
+            booking_id=int(self.get_table_text(self.row_selected,0))
+            # execute the operation of delete booking
+            status=self.manager.delete_booking(self.token,booking_id)
+            if status:
+                self.log('Delete booking '+str(booking_id)+' successful')
+            else:
+                self.log('Delete failure')
+            # flash page
+            self.show_room_booking(self.room_now)
+        return
+      
+    # save the change of data
+    def confirm_change(self):
+        self.confirm_button.setText('Confirm')
+        
+        table=self.get_table_shown()
+        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        rows=table.rowCount()
+        cols=table.columnCount()
+        if self.page=='room':
+            for row in range(rows):
+                room_info=[]
+                for col in range(cols):
+                    item=table.item(row,col)
+                    if item==None:
+                        self.log('The info in '+str((row,col))+' is None, Please check it')
+                        return
+                    room_info.append(item.text())
+                room_info=tuple(room_info)
+                self.manager.add_room(self.token,Room(*room_info))
+        
+        if self.page=='booking':
+            for row in range(rows):
+                booking_info=[]
+                for col in range(cols):
+                    item=table.item(row,col)
+                    if item==None:
+                        self.log('Error! The info in '+str((row,col))+' is invalid, Please check it')
+                        return
+                    booking_info.append(item.text())
+                if int(booking_info[1])!=self.room_now:
+                    self.log('Error! Please check the room id')
+                booking_info=BOOKING(*booking_info)
+                self.manager.add_booking(self.token,booking_info)
     
     def table_set_text(self,table,row,col,text):
         item=QTableWidgetItem()
         item.setText(str(text))
         table.setItem(row,col,item)
+        
+        
+    # back to last page
+    def back(self):
+        if self.page=='room':
+            return
+        if self.page=='booking':
+            self.show_room_list()
+            return
+        pass
     
+    def log(self,text):
+        self.console_text.append(str(text))
+        
     def closeEvent(self,event):
         self.manager.save()
         event.accept()
+        sys.exit(0)
 
