@@ -147,6 +147,8 @@ class AdminWindow(QMainWindow):
         self.add_button.clicked.connect(self.add_row)
         self.confirm_button.clicked.connect(self.confirm_change)
         self.delete_button.clicked.connect(self.try_del_row)
+        self.search_button.clicked.connect(self.search_room)
+        
         self.room_list_table.cellDoubleClicked.connect(self.entrance_room_booking)
         self.room_list_table.cellClicked.connect(self.record_row)
         
@@ -155,7 +157,7 @@ class AdminWindow(QMainWindow):
         self.pages['room']=[self.room_list_table]
         self.pages['booking']=[self.room_booking_table]
         
-        self.show_room_list()
+        self.show_room_list(self.manager.RoomData)
         
     # change visible of forms by the content of self.page
     def change_visible(self):
@@ -167,11 +169,9 @@ class AdminWindow(QMainWindow):
                 for item in value:
                     item.setVisible(False)
     
-    def show_room_list(self):
+    def show_room_list(self,RoomData):
         self.page='room'
         self.change_visible()
-        
-        RoomData=self.manager.RoomData
         
         table=self.room_list_table
         
@@ -221,6 +221,22 @@ class AdminWindow(QMainWindow):
             self.table_set_text(table,row,3,booking.start_time)
             self.table_set_text(table,row,4,booking.end_time)
             row+=1
+    
+    def search_room(self):
+        conditions={'ID':self.ID_edit.text(),
+                    'Building':self.Building_edit.text(),
+                    'CapacityMin':self.CapacityMin_edit.text(),
+                    'CapacityMax':self.CapacityMax_edit.text(),
+                    'Type':self.Type_edit.text(),
+                    'Facilities':self.Facilities_edit.text()}
+        
+        RoomData=self.manager.search_room(**conditions)
+        if type(RoomData)==str:
+            self.log('Please check the valid of search conditions')
+            self.log(RoomData)
+        else:
+            self.show_room_list(RoomData)
+        pass
     
     # get the table shown now
     def get_table_shown(self):
@@ -298,7 +314,7 @@ class AdminWindow(QMainWindow):
             else:
                 self.log('Delete failure')
             # flash page
-            self.show_room_list()
+            self.show_room_list(self.manager.RoomData)
         
         if self.page=='booking':
             booking_id=int(self.get_table_text(self.row_selected,0))
@@ -357,7 +373,7 @@ class AdminWindow(QMainWindow):
         if self.page=='room':
             return
         if self.page=='booking':
-            self.show_room_list()
+            self.show_room_list(self.manager.RoomData)
             return
         pass
     

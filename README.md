@@ -12,6 +12,32 @@
      -2-临时授权token：每次登陆之后，serve生成一个带有时效性的token，发送给client，每次client发送操作命令要带着token来验证身份。 serve通过token来识别用户身份和权限。
 4. 如何进行页面覆盖和返回
    - 页面的切换实际上是表格数据以及按钮的切换。
+5. 在遍历字典时删除元素会产生报错
+
+报错代码如下
+
+```python
+for room_id,room in RoomData.items():
+    if room.Capacity > int(conditions['CapacityMax']):
+        RoomData.pop(room_id)
+```
+
+报错如下：
+
+```
+dictionary changed size during iteration
+```
+
+解决方案：迭代字典`key`值组成的`list`而非字典本身，从而解决这个问题：
+
+```
+for room_id in list(RoomData.keys()):
+    if RoomData[room_id].Capacity < int(conditions['CapacityMin']):
+        RoomData.pop(room_id)
+```
+
+
+
 
 
 - 部分单元格自动填写及锁定

@@ -33,6 +33,7 @@ class Room(object):
         #init booking information
         self.bookings=defaultdict(BOOKING)
         self.save_dir='cache/room_booking/'
+        
     
     #update Room information  
     def update_info(self,ID:int=None,Building:str=None,Name:str=None,Capacity:int=None,Type:str=None,Facilities:str=None):
@@ -210,6 +211,61 @@ class RoomManager(object):
                 booking_list[booking.booking_id]=booking
                 
         return booking_list
+    
+    def search_room(self,**conditions):
+        RoomData=self.RoomData.copy()
+        # ID filter
+        try:
+            if 'ID' in conditions.keys() and conditions['ID']!='':
+                for room_id in list(RoomData.keys()):
+                    if RoomData[room_id].ID !=int(conditions['ID']):
+                        RoomData.pop(room_id)
+            
+            # Building filter
+            if 'Building' in conditions.keys() and conditions['Building']!='':
+                for room_id in list(RoomData.keys()):
+                    if RoomData[room_id].Building.lower() !=conditions['Building'].lower():
+                        RoomData.pop(room_id)
+                        
+            # Name filter
+            # if 'Name' in conditions.keys() and conditions['Name']!='':
+            #     for room_id,room in RoomData.items():
+            #         if RoomData[room_id].Name !=conditions['Name']:
+            #             RoomData.pop(room_id)
+            
+            # Capacity filter
+            if 'CapacityMin' in conditions.keys() and conditions['CapacityMin']!='':
+                for room_id in list(RoomData.keys()):
+                    if RoomData[room_id].Capacity < int(conditions['CapacityMin']):
+                        RoomData.pop(room_id)
+            if 'CapacityMax' in conditions.keys() and conditions['CapacityMax']!='':
+                for room_id in list(RoomData.keys()):
+                    if RoomData[room_id].Capacity > int(conditions['CapacityMax']):
+                        RoomData.pop(room_id)
+            
+            # Type filter
+            if 'Type' in conditions.keys() and conditions['Type']!='':
+                for room_id in list(RoomData.keys()):
+                    if RoomData[room_id].Type.lower() !=conditions['Type'].lower():
+                        RoomData.pop(room_id)
+            
+            # Facilities filter
+            if 'Facilities' in conditions.keys() and conditions['Facilities']!='':
+                for room_id in list(RoomData.keys()):
+                    if self.check_facility(conditions['Facilities'],RoomData[room_id].Facilities):
+                        RoomData.pop(room_id)
+        except (Exception,BaseException) as e:
+            return e
+        return RoomData
+    
+    def check_facility(facilities:str,room_facilities:str):
+        facilities=facilities.lower()
+        facilities=facilities.split()
+        room_facilities=room_facilities.lower()
+        for facility in facilities:
+            if facility not in room_facilities:
+                return False
+        return True
     
     # the valid operations of admin
     # add room
