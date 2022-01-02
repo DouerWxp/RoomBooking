@@ -266,7 +266,7 @@ class RoomManager(object):
             # Facilities filter
             if conditions['Facilities']!='':
                 for room_id in list(RoomData.keys()):
-                    if self.check_facility(conditions['Facilities'],RoomData[room_id].Facilities):
+                    if not self.check_facility(conditions['Facilities'],RoomData[room_id].Facilities):
                         RoomData.pop(room_id)
             
             if conditions['StartTime']!='':
@@ -281,6 +281,7 @@ class RoomManager(object):
     
     # check if the facilities of room include the facilities condition
     def check_facility(self,facilities:str,room_facilities:str):
+        print(facilities,room_facilities)
         facilities=facilities.lower().split(',')
         room_facilities=room_facilities.lower()
         for facility in facilities:
