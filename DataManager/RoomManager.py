@@ -1,3 +1,14 @@
+#! python3
+# -*- encoding: utf-8 -*-
+'''
+@File    :   RoomManager.py
+@Created :   2021/12/01 23:03:40
+@Changed :   2022/01/02 22:46:21
+@Author  :   Wu Xiuping (2145265) 
+@Contact :   douerwxp@gmail.com
+'''
+
+
 import os
 from collections import namedtuple,defaultdict
 import datetime
@@ -36,22 +47,20 @@ class Room(object):
     
     #update Room information  
     def update_info(self,ID:int=None,Building:str=None,Name:str=None,Capacity:int=None,Type:str=None,Facilities:str=None):
-        if not ID==None:
+        if ID!=None:
             self.ID=ID
-        if not Building==None:
+        if Building!=None:
             self.Building=Building
-        if not Name==None:
+        if Name!=None:
             self.Name=Name
-        if not Capacity==None:
+        if Capacity!=None:
             self.Capacity=Capacity
-        if not Type==None:
+        if Type!=None:
             self.Type=Type
-        if not Facilities==None:
+        if Facilities!=None:
             self.Facilities=Facilities
     
-    # booking process
-    # input: booking information
-    # output: success(True) or error(False)
+    # room book function
     def book(self,booking:BOOKING):
         if self.is_available(booking.start_time,booking.end_time):
             self.bookings[booking.booking_id]=(booking)
@@ -60,16 +69,14 @@ class Room(object):
         logging.error('Time clash')
         return False
     
-    # cancel booking 
-    # input: booking ID
-    # output: success(True) or error(False)
+    # cancel a booking by the booking id
     def cancel(self,booking_id):
         if booking_id in self.bookings.keys():
             self.bookings.pop(booking_id)
             return True
         return False
     
-    #check if the booking time is available
+    #check if the booking timeslot is available
     def is_available(self,start_time,end_time):
         available=True
         
@@ -87,6 +94,9 @@ class Room(object):
                 available=False
         
         return available
+    
+    def get_prop(self):
+        return (self.ID,self.Building,self.Name,self.Capacity,self.Type,self.Facilities)
     
     # store the booking information in a csv file
     def booking_to_csv(self):
@@ -117,7 +127,6 @@ class RoomManager(object):
         super().__init__()
         self.datafile=datafile
         self.RoomData=defaultdict(Room)
-        self.access_guest_token=defaultdict(str)
         self.access_admin_token=defaultdict(str)
         
         self.token_mem=defaultdict(TOKENMEM)
@@ -147,8 +156,6 @@ class RoomManager(object):
         username=self.get_user(token)
         if username in self.access_admin_token.keys():
             return 0
-        if username in self.access_guest_token.keys():
-            return 1
         return -1
     
     # identify user by token 
@@ -157,17 +164,6 @@ class RoomManager(object):
             if value.token==token:
                 return username
         return False
-    
-    # register a new account checking if the username has been used
-    def register(self,username,password):
-        
-        if username in self.access_guest_token.keys() or username in self.access_admin_token.keys():
-            print('This username has been used')
-            return False
-        
-        self.access_guest_token[username]=self.gen_token(username,password) 
-        print('Register Successful')
-        return True
     
     # import the username and password of managers
     def admin_from_csv(self,filepath):
@@ -179,8 +175,7 @@ class RoomManager(object):
             password=row['password']
             self.access_admin_token[username]=self.gen_token(username,password)
         return
-    
-    # log in
+
     # if log in successful return template token otherwise False
     def login(self,username,password):
         login_token=self.gen_token(username,password)
@@ -245,48 +240,37 @@ class RoomManager(object):
     def search_room(self,**conditions):
         RoomData=self.RoomData.copy()
         try:
-            # ID filter
-            if 'ID' in conditions.keys() and conditions['ID']!='':
-                for room_id in list(RoomData.keys()):
-                    if RoomData[room_id].ID !=int(conditions['ID']):
-                        RoomData.pop(room_id)
-            
             # Building filter
-            if 'Building' in conditions.keys() and conditions['Building']!='':
+            if conditions['Building']!='':
                 for room_id in list(RoomData.keys()):
                     if RoomData[room_id].Building.lower() !=conditions['Building'].lower():
                         RoomData.pop(room_id)
-                        
-            # Name filter
-            if 'Name' in conditions.keys() and conditions['Name']!='':
-                for room_id,room in RoomData.items():
-                    if RoomData[room_id].Name !=conditions['Name']:
-                        RoomData.pop(room_id)
             
             # Capacity filter
-            if 'CapacityMin' in conditions.keys() and conditions['CapacityMin']!='':
+            if conditions['CapacityMin']!='':
                 for room_id in list(RoomData.keys()):
                     if RoomData[room_id].Capacity < int(conditions['CapacityMin']):
                         RoomData.pop(room_id)
-            if 'CapacityMax' in conditions.keys() and conditions['CapacityMax']!='':
+                        
+            if conditions['CapacityMax']!='':
                 for room_id in list(RoomData.keys()):
                     if RoomData[room_id].Capacity > int(conditions['CapacityMax']):
                         RoomData.pop(room_id)
             
             # Type filter
-            if 'Type' in conditions.keys() and conditions['Type']!='':
+            if conditions['Type']!='':
                 for room_id in list(RoomData.keys()):
                     if RoomData[room_id].Type.lower() !=conditions['Type'].lower():
                         RoomData.pop(room_id)
             
             # Facilities filter
-            if 'Facilities' in conditions.keys() and conditions['Facilities']!='':
+            if conditions['Facilities']!='':
                 for room_id in list(RoomData.keys()):
                     if self.check_facility(conditions['Facilities'],RoomData[room_id].Facilities):
                         RoomData.pop(room_id)
             
-            if 'StartTime' in conditions.keys() and conditions['StartTime']!='':
-                if 'EndTime' in conditions.keys() and conditions['EndTime']!='':
+            if conditions['StartTime']!='':
+                if conditions['EndTime']!='':
                     for room_id in list(RoomData.keys()):
                         if not self.RoomData[room_id].is_available(conditions['StartTime'],conditions['EndTime']):
                             RoomData.pop(room_id)
@@ -297,15 +281,13 @@ class RoomManager(object):
     
     # check if the facilities of room include the facilities condition
     def check_facility(self,facilities:str,room_facilities:str):
-        facilities=facilities.lower()
-        facilities=facilities.split()
+        facilities=facilities.lower().split(',')
         room_facilities=room_facilities.lower()
         for facility in facilities:
             if facility not in room_facilities:
                 return False
         return True
     
-    # the valid operations of admin
     # add room
     # if the room id exist, then update the room information
     def add_room(self,token:str,room_info):

@@ -1,16 +1,23 @@
+#! python3
+# -*- encoding: utf-8 -*-
+'''
+@File    :   app.py
+@Created :   2021/12/15 12:55:24
+@Changed :   2022/01/02 22:46:21
+@Author  :   Wu Xiuping (2145265) 
+@Contact :   douerwxp@gmail.com
+'''
+
 from collections import defaultdict
 import os
 import sys
 from PyQt5.QtWidgets import QMainWindow,QDialog,QLineEdit,QHeaderView,QTableWidgetItem,QAbstractItemView, QWidget
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.uic import loadUi
+from Gui.ui_admin import Ui_Admin
+from Gui.ui_confirm import Ui_Confirm
+from Gui.ui_login import Ui_Login
 
-from DataManager.RoomManager import BOOKING, RoomManager,Room
-
-# ui files
-login_ui_file='Gui/login.ui'
-admin_ui_file='Gui/admin.ui'
-confirm_ui_file='Gui/confirm.ui'
+from DataManager.RoomManager import BOOKING, RoomManager
 
 # data files
 manager_file='cache/room_manager.pkl'
@@ -18,14 +25,15 @@ admin_file='cache/admin.csv'
 room_list_file='cache/room_list.csv'
 token_file='cache/token'
 
-class LoginWindow(QDialog):
+class LoginWindow(QDialog,Ui_Login):
     
     # signal connect to the main window
     login_signal=pyqtSignal(dict)
     
     def __init__(self,parent=None):
         super(LoginWindow,self).__init__(parent)
-        loadUi(login_ui_file,self)
+        self.setupUi(self)
+        
         self.login_button.accepted.connect(self.login)
         self.login_button.rejected.connect(self.close)
         self.login_password.setEchoMode(QLineEdit.Password)
@@ -46,13 +54,13 @@ class LoginWindow(QDialog):
     def closeEvent(self,event):
         sys.exit(0)
 
-class ConfirmWindow(QDialog):
+class ConfirmWindow(QDialog,Ui_Confirm):
     
     confirm_signal=pyqtSignal(dict)
     
     def __init__(self,parent=None):
         super(ConfirmWindow,self).__init__(parent)
-        loadUi(confirm_ui_file,self)
+        self.setupUi(self)
         
         self.buttonBox.rejected.connect(self.reject)
         self.buttonBox.accepted.connect(self.accept)
@@ -72,8 +80,6 @@ class ConfirmWindow(QDialog):
     
     def closeEvent(self,event):
         event.accept()
-            
-    
         
 
 class MainWindow(QWidget):
@@ -92,7 +98,6 @@ class MainWindow(QWidget):
             window=AdminWindow(self.manager,self.token,self)
             window.show()
             
-        
     def login(self,content):
         username=content['username']
         password=content['password']
@@ -125,9 +130,10 @@ class MainWindow(QWidget):
         pass
 
 
-class AdminWindow(QMainWindow):
+class AdminWindow(QMainWindow,Ui_Admin):
     def __init__(self,manager:RoomManager,token,parent=None):
         super(AdminWindow,self).__init__(parent)
+        self.setupUi(self)
         
         self.manager=manager
         self.token=token
@@ -141,7 +147,6 @@ class AdminWindow(QMainWindow):
         # record the row selected now
         self.row_selected=None
         
-        loadUi(admin_ui_file,self)
         self.back_button.clicked.connect(self.back)
         
         self.edit_button.clicked.connect(self.edit_table)
@@ -187,12 +192,8 @@ class AdminWindow(QMainWindow):
         
         row=0
         for room in RoomData.values():
-            self.table_set_text(table,row,0,room.ID)
-            self.table_set_text(table,row,1,room.Building)
-            self.table_set_text(table,row,2,room.Name)
-            self.table_set_text(table,row,3,room.Capacity)
-            self.table_set_text(table,row,4,room.Type)
-            self.table_set_text(table,row,5,room.Facilities)
+            for col in range(6):
+                self.table_set_text(table,row,col,room.get_prop()[col])
             row+=1
     
     def entrance_room_booking(self,row,col):
@@ -209,7 +210,6 @@ class AdminWindow(QMainWindow):
         room=self.manager.RoomData[room_id]
         bookings=room.bookings
         
-        
         table=self.room_booking_table
         table.setRowCount(len(bookings))
         table.setColumnCount(self.booking_prop_count)
@@ -219,11 +219,8 @@ class AdminWindow(QMainWindow):
         
         row=0
         for booking in bookings.values():
-            self.table_set_text(table,row,0,booking.booking_id)
-            self.table_set_text(table,row,1,booking.room_id)
-            self.table_set_text(table,row,2,booking.user)
-            self.table_set_text(table,row,3,booking.start_time)
-            self.table_set_text(table,row,4,booking.end_time)
+            for col in range(5):
+                self.table_set_text(table,row,col,booking[col])
             row+=1
     
     # get conditions from the GUI window, filter the rooms and show the valid rooms in the window
@@ -281,19 +278,20 @@ class AdminWindow(QMainWindow):
         
         
         table=self.get_table_shown()
-        table.setRowCount(table.rowCount()+1)
+        rows=table.rowCount()
+        table.setRowCount(rows+1)
         self.edit_table()
         if self.page=='booking':
             # generate the booking id
-            self.table_set_text(table,table.rowCount()-1,0,self.manager.booking_count)
+            self.table_set_text(table,rows,0,self.manager.booking_count)
             self.manager.booking_count+=1
             # generate the room id
-            self.table_set_text(table,table.rowCount()-1,1,self.room_now)
+            self.table_set_text(table,rows,1,self.room_now)
             # generate the username
-            self.table_set_text(table,table.rowCount()-1,2,self.user)
+            self.table_set_text(table,rows,2,self.user)
         if self.page=='room':
             # generate the room id
-            self.table_set_text(table,table.rowCount()-1,0,self.manager.room_count)
+            self.table_set_text(table,rows,0,self.manager.room_count)
             self.manager.room_count+=1
 
     # delete a row and try to delete the data
