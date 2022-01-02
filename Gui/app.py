@@ -225,8 +225,7 @@ class AdminWindow(QMainWindow,Ui_Admin):
     
     # get conditions from the GUI window, filter the rooms and show the valid rooms in the window
     def search_room(self):
-        conditions={'ID':self.ID_edit.text(),
-                    'Building':self.Building_edit.text(),
+        conditions={'Building':self.Building_edit.text(),
                     'CapacityMin':self.CapacityMin_edit.text(),
                     'CapacityMax':self.CapacityMax_edit.text(),
                     'Type':self.Type_edit.text(),
