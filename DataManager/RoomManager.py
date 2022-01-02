@@ -12,9 +12,8 @@ if not os.path.exists('log'):
     os.mkdir('log')
 logging.basicConfig(filename='log/roombooking.log',level=logging.INFO)
 
-#structure three types 
+#structure some data types 
 BOOKING=namedtuple('Booking',['booking_id','room_id','user','start_time','end_time'])
-CANCEL=namedtuple('Cancel',['cancel_id','booking_id'])
 TOKENMEM=namedtuple('TempToken',['expired_time','token','authority'])
 
 #identify a class to store room information
@@ -125,14 +124,17 @@ class RoomManager(object):
         self.booking_queue=defaultdict(BOOKING)
         self.booking_count=0
         
-        self.cancel_queue=defaultdict()
-        self.cancel_count=0
-        
-        
         self.load()
-        
+        self.reset_count()
+    
+    def reset_count(self):
         if len(self.get_booking_list().keys()):
-            self.booking_count=max(self.get_booking_list().keys())
+            self.booking_count=max(self.get_booking_list().keys())+1
+        else:
+            self.booking_count=0
+            
+        if len(self.RoomData.keys()):
+            self.room_count=max(self.RoomData.keys())+1
         else:
             self.booking_count=0
     
@@ -169,6 +171,8 @@ class RoomManager(object):
     
     # import the username and password of managers
     def admin_from_csv(self,filepath):
+        if not os.path.exists(filepath):
+            return
         df=pd.read_csv(filepath)
         for _,row in df.iterrows():
             username=row['username']
@@ -187,13 +191,16 @@ class RoomManager(object):
             return temp_token
         
         return False
-          
+    
+    # load a object from a disk file 
     def load(self):
         if os.path.exists(self.datafile):
             with open(self.datafile,'rb') as f:
                 return dill.load(f)
+        self.room_list_from_csv('cache/room_list.csv')
         return self
     
+    # save this object to a file
     def save(self):
         with open(self.datafile,'wb') as f:
             self=dill.dump(self,f)
@@ -234,10 +241,11 @@ class RoomManager(object):
                 
         return booking_list
     
+    # filter rooms by the given conditions
     def search_room(self,**conditions):
         RoomData=self.RoomData.copy()
-        # ID filter
         try:
+            # ID filter
             if 'ID' in conditions.keys() and conditions['ID']!='':
                 for room_id in list(RoomData.keys()):
                     if RoomData[room_id].ID !=int(conditions['ID']):
@@ -250,10 +258,10 @@ class RoomManager(object):
                         RoomData.pop(room_id)
                         
             # Name filter
-            # if 'Name' in conditions.keys() and conditions['Name']!='':
-            #     for room_id,room in RoomData.items():
-            #         if RoomData[room_id].Name !=conditions['Name']:
-            #             RoomData.pop(room_id)
+            if 'Name' in conditions.keys() and conditions['Name']!='':
+                for room_id,room in RoomData.items():
+                    if RoomData[room_id].Name !=conditions['Name']:
+                        RoomData.pop(room_id)
             
             # Capacity filter
             if 'CapacityMin' in conditions.keys() and conditions['CapacityMin']!='':
@@ -287,6 +295,7 @@ class RoomManager(object):
             return e
         return RoomData
     
+    # check if the facilities of room include the facilities condition
     def check_facility(self,facilities:str,room_facilities:str):
         facilities=facilities.lower()
         facilities=facilities.split()
@@ -298,17 +307,18 @@ class RoomManager(object):
     
     # the valid operations of admin
     # add room
-    def add_room(self,token:str,room:Room):
+    # if the room id exist, then update the room information
+    def add_room(self,token:str,room_info):
+        room=Room(*room_info)
         if self.check_token(token)==0:
             for exist_room in self.RoomData.values():
                 if room.ID==exist_room.ID:
-                    print('ID clash: the ID of rooms should be different')
-                    return False
+                    self.RoomData[room.ID].update_info(*room_info)
             self.RoomData[room.ID]=room
             return True
         return False
     
-    # delete room
+    # delete room by the room id
     def delete_room(self,token,room_id:int):
         if self.check_token(token)==0:
             self.RoomData.pop(room_id)
@@ -320,14 +330,10 @@ class RoomManager(object):
         if self.check_token(token)==0:
             room_id=int(booking.room_id)
             self.RoomData[room_id].book(booking)
-            if len(self.get_booking_list().keys()):
-                self.booking_count=max(self.get_booking_list().keys())
-            else:
-                self.booking_count=0
             return True
         return False
     
-    # delete booking 
+    # delete booking by the booking id
     def delete_booking(self,token,booking_id):
         booking_id=str(booking_id)
         if self.check_token(token)==0:
@@ -336,27 +342,3 @@ class RoomManager(object):
                 room_id=int(booking_list[booking_id].room_id)
                 return self.RoomData[room_id].cancel(booking_id)
         return False
-    
-    # the valid operations of guests
-    # add booking operation in the booking queue
-    def book_room(self,token,ID,start_time,end_time):
-        if self.check_token(token)==-1:
-            return False
-        user=self.get_user(token)
-        if user == None:
-            return False
-        self.booking_queue[self.booking_count]=BOOKING(self.booking_count,ID,user,start_time,end_time)
-        self.booking_count+=1
-        return True
-    
-    # add canceling operation in the canceling queue
-    def cancel_book(self,token,booking_id):
-        if self.check_token(token)==-1:
-            return False
-        user=self.get_user(token)
-        if user == None:
-            return False
-        self.cancel_queue[self.cancel_count]=CANCEL(self.cancel_count,booking_id)
-        self.cancel_count+=1
-        return True
-

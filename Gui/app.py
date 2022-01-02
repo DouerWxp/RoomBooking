@@ -39,7 +39,7 @@ class LoginWindow(QDialog):
         content={'username':username,
                  'password':password,
                  'remember':remember}
-
+        # delivery the login info to the main window
         self.login_signal.emit(content)
     
     # if close the login window, then exit the whole program
@@ -56,7 +56,8 @@ class ConfirmWindow(QDialog):
         
         self.buttonBox.rejected.connect(self.reject)
         self.buttonBox.accepted.connect(self.accept)
-        
+    
+    # set the text in the text box
     def set_text(self,text):
         self.textBrowser.setText(text)
     
@@ -82,7 +83,6 @@ class MainWindow(QWidget):
         
         self.manager=RoomManager(manager_file).load()
         self.manager.admin_from_csv(admin_file)
-        self.manager.room_list_from_csv(room_list_file)
         
         self.token=None
         self.auth=None
@@ -172,6 +172,7 @@ class AdminWindow(QMainWindow):
                 for item in value:
                     item.setVisible(False)
     
+    # show room list in the table of the main window
     def show_room_list(self,RoomData):
         self.page='room'
         self.change_visible()
@@ -200,6 +201,7 @@ class AdminWindow(QMainWindow):
         self.room_now=room_id
         self.show_room_booking(room_id)
     
+    # show room bookings in the table of the main window
     def show_room_booking(self,room_id):
         self.page='booking'
         self.change_visible()
@@ -224,6 +226,7 @@ class AdminWindow(QMainWindow):
             self.table_set_text(table,row,4,booking.end_time)
             row+=1
     
+    # get conditions from the GUI window, filter the rooms and show the valid rooms in the window
     def search_room(self):
         conditions={'ID':self.ID_edit.text(),
                     'Building':self.Building_edit.text(),
@@ -252,6 +255,7 @@ class AdminWindow(QMainWindow):
             return self.room_booking_table
         self.log('page error!')
     
+    # get the text in a location of table
     def get_table_text(self,row,col):
         table=self.get_table_shown()
         item=table.item(row,col)
@@ -259,18 +263,22 @@ class AdminWindow(QMainWindow):
             return None
         return item.text()
     
+    # let the table could be edited
     def edit_table(self):
-        self.confirm_button.setText('Confirm*')
+        self.confirm_button.setText('Confirm*')        
         
         table=self.get_table_shown()
         table.setEditTriggers(QAbstractItemView.CurrentChanged)
         self.log('start edit......')
-        
+    
+    # record the row clicked now
     def record_row(self,row,col):
         self.row_selected=row
     
+    # add a new row to the table shown now
     def add_row(self):
         self.confirm_button.setText('Confirm*')
+        
         
         table=self.get_table_shown()
         table.setRowCount(table.rowCount()+1)
@@ -283,11 +291,16 @@ class AdminWindow(QMainWindow):
             self.table_set_text(table,table.rowCount()-1,1,self.room_now)
             # generate the username
             self.table_set_text(table,table.rowCount()-1,2,self.user)
+        if self.page=='room':
+            # generate the room id
+            self.table_set_text(table,table.rowCount()-1,0,self.manager.room_count)
+            self.manager.room_count+=1
 
-    
+    # delete a row and try to delete the data
     def try_del_row(self):
         confirm_window=ConfirmWindow(self)
         confirm_window.confirm_signal.connect(self.delete_row)
+        self.manager.reset_count()
 
         if self.page=='room':
             # get the room id of the room selected
@@ -312,7 +325,7 @@ class AdminWindow(QMainWindow):
         
         confirm_window.exec_()
     
-    # delete a row data
+    # really delete a row data
     def delete_row(self,accepted):
         if not accepted:
             return
@@ -346,6 +359,8 @@ class AdminWindow(QMainWindow):
     # save the change of data
     def confirm_change(self):
         self.confirm_button.setText('Confirm')
+        self.manager.reset_count()
+        
         
         table=self.get_table_shown()
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -358,10 +373,12 @@ class AdminWindow(QMainWindow):
                     item=table.item(row,col)
                     if item==None:
                         self.log('The info in '+str((row,col))+' is None, Please check it')
+                        self.show_room_list(self.manager.RoomData)
                         return
                     room_info.append(item.text())
                 room_info=tuple(room_info)
-                self.manager.add_room(self.token,Room(*room_info))
+                self.manager.add_room(self.token,room_info)
+            self.show_room_list(self.manager.RoomData)
         
         if self.page=='booking':
             for row in range(rows):
@@ -370,21 +387,26 @@ class AdminWindow(QMainWindow):
                     item=table.item(row,col)
                     if item==None:
                         self.log('Error! The info in '+str((row,col))+' is invalid, Please check it')
+                        self.show_room_booking(self.room_now)
                         return
                     booking_info.append(item.text())
                 if int(booking_info[1])!=self.room_now:
                     self.log('Error! Please check the room id')
+                    self.show_room_booking(self.room_now)
                 booking_info[0]=int(booking_info[0])
                 booking_info[1]=int(booking_info[1])
                 booking_info=BOOKING(*booking_info)
                 self.manager.add_booking(self.token,booking_info)
+            self.show_room_booking(self.room_now)
         self.log('Confirm table change')
-    
+        
+    # change the text in the table 
     def table_set_text(self,table,row,col,text):
         item=QTableWidgetItem()
         item.setText(str(text))
         table.setItem(row,col,item)
-        
+    
+    # export the data to the csv file
     def export(self):
         if self.page=='room':
             self.manager.room_list_to_csv(room_list_file)
@@ -396,16 +418,18 @@ class AdminWindow(QMainWindow):
         
     # back to last page
     def back(self):
+        self.manager.reset_count()
         if self.page=='room':
             return
         if self.page=='booking':
             self.show_room_list(self.manager.RoomData)
             return
-        pass
     
+    # print the log to the text box
     def log(self,text):
         self.console_text.append(str(text))
-        
+    
+    # some command would be execute when the window is closed
     def closeEvent(self,event):
         self.manager.save()
         event.accept()
