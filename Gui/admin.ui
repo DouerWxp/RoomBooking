@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1200</width>
-    <height>798</height>
+    <height>835</height>
    </rect>
   </property>
   <property name="acceptDrops">
@@ -24,7 +24,7 @@
     <property name="geometry">
      <rect>
       <x>40</x>
-      <y>70</y>
+      <y>120</y>
       <width>961</width>
       <height>491</height>
      </rect>
@@ -47,7 +47,7 @@
     <property name="geometry">
      <rect>
       <x>40</x>
-      <y>70</y>
+      <y>120</y>
       <width>961</width>
       <height>491</height>
      </rect>
@@ -57,7 +57,7 @@
     <property name="geometry">
      <rect>
       <x>1040</x>
-      <y>80</y>
+      <y>120</y>
       <width>141</width>
       <height>28</height>
      </rect>
@@ -70,7 +70,7 @@
     <property name="geometry">
      <rect>
       <x>40</x>
-      <y>580</y>
+      <y>620</y>
       <width>72</width>
       <height>15</height>
      </rect>
@@ -83,7 +83,7 @@
     <property name="geometry">
      <rect>
       <x>40</x>
-      <y>610</y>
+      <y>650</y>
       <width>961</width>
       <height>131</height>
      </rect>
@@ -93,7 +93,7 @@
     <property name="geometry">
      <rect>
       <x>1040</x>
-      <y>190</y>
+      <y>230</y>
       <width>141</width>
       <height>28</height>
      </rect>
@@ -106,7 +106,7 @@
     <property name="geometry">
      <rect>
       <x>1040</x>
-      <y>250</y>
+      <y>290</y>
       <width>141</width>
       <height>28</height>
      </rect>
@@ -119,7 +119,7 @@
     <property name="geometry">
      <rect>
       <x>1040</x>
-      <y>130</y>
+      <y>170</y>
       <width>141</width>
       <height>28</height>
      </rect>
@@ -270,13 +270,72 @@
     <property name="geometry">
      <rect>
       <x>1040</x>
-      <y>30</y>
+      <y>50</y>
+      <width>141</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Search</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_8">
+    <property name="geometry">
+     <rect>
+      <x>260</x>
+      <y>90</y>
+      <width>81</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Start Time</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="StartTime_edit">
+    <property name="geometry">
+     <rect>
+      <x>370</x>
+      <y>80</y>
+      <width>221</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_9">
+    <property name="geometry">
+     <rect>
+      <x>640</x>
+      <y>90</y>
+      <width>81</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>End Time</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="EndTime_edit">
+    <property name="geometry">
+     <rect>
+      <x>760</x>
+      <y>80</y>
+      <width>231</width>
+      <height>31</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="export_button">
+    <property name="geometry">
+     <rect>
+      <x>1040</x>
+      <y>350</y>
       <width>141</width>
       <height>28</height>
      </rect>
     </property>
     <property name="text">
-     <string>Search</string>
+     <string>Export</string>
     </property>
    </widget>
   </widget>

@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 import sys
 from PyQt5.QtWidgets import QMainWindow,QDialog,QLineEdit,QHeaderView,QTableWidgetItem,QAbstractItemView, QWidget
@@ -148,9 +149,11 @@ class AdminWindow(QMainWindow):
         self.confirm_button.clicked.connect(self.confirm_change)
         self.delete_button.clicked.connect(self.try_del_row)
         self.search_button.clicked.connect(self.search_room)
+        self.export_button.clicked.connect(self.export)
         
         self.room_list_table.cellDoubleClicked.connect(self.entrance_room_booking)
         self.room_list_table.cellClicked.connect(self.record_row)
+        self.room_booking_table.cellClicked.connect(self.record_row)
         
         
         self.pages={}
@@ -196,7 +199,6 @@ class AdminWindow(QMainWindow):
         room_id=int(self.get_table_text(row,0))
         self.room_now=room_id
         self.show_room_booking(room_id)
-        pass
     
     def show_room_booking(self,room_id):
         self.page='booking'
@@ -228,14 +230,18 @@ class AdminWindow(QMainWindow):
                     'CapacityMin':self.CapacityMin_edit.text(),
                     'CapacityMax':self.CapacityMax_edit.text(),
                     'Type':self.Type_edit.text(),
-                    'Facilities':self.Facilities_edit.text()}
+                    'Facilities':self.Facilities_edit.text(),
+                    'StartTime':self.StartTime_edit.text(),
+                    'EndTime':self.EndTime_edit.text()}
         
         RoomData=self.manager.search_room(**conditions)
-        if type(RoomData)==str:
+        if type(RoomData)!=defaultdict:
             self.log('Please check the valid of search conditions')
             self.log(RoomData)
         else:
             self.show_room_list(RoomData)
+            if len(RoomData)==0:
+                self.log('There is no room that matches the conditions. Please Change the filter criteria and try again')
         pass
     
     # get the table shown now
@@ -262,7 +268,6 @@ class AdminWindow(QMainWindow):
         
     def record_row(self,row,col):
         self.row_selected=row
-        print(row)
     
     def add_row(self):
         self.confirm_button.setText('Confirm*')
@@ -270,7 +275,15 @@ class AdminWindow(QMainWindow):
         table=self.get_table_shown()
         table.setRowCount(table.rowCount()+1)
         self.edit_table()
-        pass
+        if self.page=='booking':
+            # generate the booking id
+            self.table_set_text(table,table.rowCount()-1,0,self.manager.booking_count)
+            self.manager.booking_count+=1
+            # generate the room id
+            self.table_set_text(table,table.rowCount()-1,1,self.room_now)
+            # generate the username
+            self.table_set_text(table,table.rowCount()-1,2,self.user)
+
     
     def try_del_row(self):
         confirm_window=ConfirmWindow(self)
@@ -280,7 +293,6 @@ class AdminWindow(QMainWindow):
             # get the room id of the room selected
             try:
                 room_id=int(self.get_table_text(self.row_selected,0))
-                print(room_id)
                 text='Delete the room: '+str(room_id)
                 confirm_window.set_text(text)
             except:
@@ -305,28 +317,31 @@ class AdminWindow(QMainWindow):
         if not accepted:
             return
         
-        if self.page=='room':
-            room_id=int(self.get_table_text(self.row_selected,0))
-            # execute the operation of delete room
-            status=self.manager.delete_room(self.token,room_id)
-            if status:
-                self.log('Delete room '+str(room_id)+' successful')
-            else:
-                self.log('Delete failure')
-            # flash page
-            self.show_room_list(self.manager.RoomData)
-        
-        if self.page=='booking':
-            booking_id=int(self.get_table_text(self.row_selected,0))
-            # execute the operation of delete booking
-            status=self.manager.delete_booking(self.token,booking_id)
-            if status:
-                self.log('Delete booking '+str(booking_id)+' successful')
-            else:
-                self.log('Delete failure')
-            # flash page
-            self.show_room_booking(self.room_now)
-        return
+        try:
+            if self.page=='room':
+                room_id=int(self.get_table_text(self.row_selected,0))
+                # execute the operation of delete room
+                status=self.manager.delete_room(self.token,room_id)
+                if status:
+                    self.log('Delete room '+str(room_id)+' successful')
+                else:
+                    self.log('Delete failure')
+                # flash page
+                self.show_room_list(self.manager.RoomData)
+            
+            if self.page=='booking':
+                booking_id=int(self.get_table_text(self.row_selected,0))
+                # execute the operation of delete booking
+                status=self.manager.delete_booking(self.token,booking_id)
+                if status:
+                    self.log('Delete booking '+str(booking_id)+' successful')
+                else:
+                    self.log('Delete failure')
+                # flash page
+                self.show_room_booking(self.room_now)
+                
+        except (Exception,BaseException) as e:
+            self.log(e)
       
     # save the change of data
     def confirm_change(self):
@@ -359,14 +374,25 @@ class AdminWindow(QMainWindow):
                     booking_info.append(item.text())
                 if int(booking_info[1])!=self.room_now:
                     self.log('Error! Please check the room id')
+                booking_info[0]=int(booking_info[0])
+                booking_info[1]=int(booking_info[1])
                 booking_info=BOOKING(*booking_info)
                 self.manager.add_booking(self.token,booking_info)
+        self.log('Confirm table change')
     
     def table_set_text(self,table,row,col,text):
         item=QTableWidgetItem()
         item.setText(str(text))
         table.setItem(row,col,item)
         
+    def export(self):
+        if self.page=='room':
+            self.manager.room_list_to_csv(room_list_file)
+            self.log('Export successful, the file is in the path /'+room_list_file)
+        
+        if self.page=='booking':
+            filepath=self.manager.RoomData[self.room_now].booking_to_csv()
+            self.log('Export successful, the file is in the path '+filepath)
         
     # back to last page
     def back(self):

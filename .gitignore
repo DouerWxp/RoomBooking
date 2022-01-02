@@ -1,6 +1,7 @@
 # custom setting
 *.pkl
 token
+/cache/room_booking
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

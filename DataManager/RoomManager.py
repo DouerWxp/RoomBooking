@@ -53,8 +53,8 @@ class Room(object):
     # booking process
     # input: booking information
     # output: success(True) or error(False)
-    def book(self,booking):
-        if self.is_available(booking):
+    def book(self,booking:BOOKING):
+        if self.is_available(booking.start_time,booking.end_time):
             self.bookings[booking.booking_id]=(booking)
             logging.info('booking successful')
             return True
@@ -71,13 +71,20 @@ class Room(object):
         return False
     
     #check if the booking time is available
-    def is_available(self,booking):
+    def is_available(self,start_time,end_time):
         available=True
         
+        # check if the input is valid
+        if not (self.str2time(start_time) and self.str2time(end_time)):
+            return False
+        
+        if self.str2time(start_time)>=self.str2time(end_time):
+            available=False
+        
         for exist_booking in self.bookings.values():
-            if self.str2time(booking.start_time)>=self.str2time(exist_booking.start_time) and self.str2time(booking.start_time)<self.str2time(exist_booking.end_time):
+            if self.str2time(start_time)>=self.str2time(exist_booking.start_time) and self.str2time(start_time)<self.str2time(exist_booking.end_time):
                 available=False
-            if self.str2time(booking.end_time)>self.str2time(exist_booking.start_time) and self.str2time(booking.end_time)<=self.str2time(exist_booking.end_time):
+            if self.str2time(end_time)>self.str2time(exist_booking.start_time) and self.str2time(end_time)<=self.str2time(exist_booking.end_time):
                 available=False
         
         return available
@@ -90,10 +97,19 @@ class Room(object):
                           'start_time':booking.start_time,
                           'end_time':booking.end_time}
             df=df.append(booking_data,ignore_index=True)
-        df.to_csv(self.save_dir+'room'+str(self.ID)+str(self.Name)+'.csv',index=False)
+        
+        if not os.path.exists(self.save_dir):
+            os.mkdir(self.save_dir)
+        filepath=self.save_dir+'room_'+str(self.ID)+'_'+str(self.Name)+'.csv'
+        df.to_csv(filepath,index=False)
+        return filepath
     
     def str2time(self,time_str):
-        return datetime.datetime.strptime(time_str,"%Y-%m-%d %H:%M")
+        try:
+            str_time=datetime.datetime.strptime(time_str,"%Y-%m-%d %H:%M")
+            return str_time
+        except:
+            return False
 
 
 # identify a class to manage rooms
@@ -112,7 +128,13 @@ class RoomManager(object):
         self.cancel_queue=defaultdict()
         self.cancel_count=0
         
+        
         self.load()
+        
+        if len(self.get_booking_list().keys()):
+            self.booking_count=max(self.get_booking_list().keys())
+        else:
+            self.booking_count=0
     
     # generate token by username and password
     def gen_token(self,username,password):
@@ -254,11 +276,18 @@ class RoomManager(object):
                 for room_id in list(RoomData.keys()):
                     if self.check_facility(conditions['Facilities'],RoomData[room_id].Facilities):
                         RoomData.pop(room_id)
+            
+            if 'StartTime' in conditions.keys() and conditions['StartTime']!='':
+                if 'EndTime' in conditions.keys() and conditions['EndTime']!='':
+                    for room_id in list(RoomData.keys()):
+                        if not self.RoomData[room_id].is_available(conditions['StartTime'],conditions['EndTime']):
+                            RoomData.pop(room_id)
+                            
         except (Exception,BaseException) as e:
             return e
         return RoomData
     
-    def check_facility(facilities:str,room_facilities:str):
+    def check_facility(self,facilities:str,room_facilities:str):
         facilities=facilities.lower()
         facilities=facilities.split()
         room_facilities=room_facilities.lower()
@@ -291,15 +320,20 @@ class RoomManager(object):
         if self.check_token(token)==0:
             room_id=int(booking.room_id)
             self.RoomData[room_id].book(booking)
+            if len(self.get_booking_list().keys()):
+                self.booking_count=max(self.get_booking_list().keys())
+            else:
+                self.booking_count=0
             return True
         return False
     
     # delete booking 
     def delete_booking(self,token,booking_id):
+        booking_id=str(booking_id)
         if self.check_token(token)==0:
             booking_list=self.get_booking_list()
             if booking_id in booking_list.keys():
-                room_id=booking_list[booking_id].room_id
+                room_id=int(booking_list[booking_id].room_id)
                 return self.RoomData[room_id].cancel(booking_id)
         return False
     
